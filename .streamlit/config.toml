@@ -1,0 +1,17 @@
+[client]
+showErrorDetails = false
+
+[logger]
+level = "info"
+
+[server]
+runOnSave = true
+enableXsrfProtection = true
+headless = true
+
+[theme]
+primaryColor = "#FF6B6B"
+backgroundColor = "#F8F9FA"
+secondaryBackgroundColor = "#E8EAED"
+textColor = "#262730"
+font = "sans serif"

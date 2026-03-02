@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: multi-llm-chat
+    runtime: python
+    runtimeVersion: "3.11"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "streamlit run app.py"
+    envVars:
+      - key: STREAMLIT_SERVER_PORT
+        value: "8501"
+      - key: STREAMLIT_SERVER_ADDRESS
+        value: "0.0.0.0"
+      - key: STREAMLIT_SERVER_HEADLESS
+        value: "true"
+      - key: STREAMLIT_LOGGER_LEVEL
+        value: "info"
