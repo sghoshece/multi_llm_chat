@@ -10,10 +10,15 @@ OPEN_AI_MODEL = "gpt-4o-mini"
 GEMINI_MODEL = "gemini-3-flash-preview"
 
 # Initialize the Gemini client
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    genai.configure(api_key=gemini_key)
 
 # Initialize the openai client
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai_key = os.getenv("OPENAI_API_KEY")
+openai_client = None
+if openai_key:
+    openai_client = OpenAI(api_key=openai_key)
 
 SYSTEM_PROMPT = "You are a Sales Executive, who is supposed to sell AI course." \
     " You are very friendly and polite in your responses." \
@@ -30,6 +35,9 @@ SYSTEM_PROMPT = "You are a Sales Executive, who is supposed to sell AI course." 
 
 def get_response_from_openai(user_query, open_ai_chat_history):
     try:
+        if not openai_client:
+            return "OpenAI API key is not configured. Please add OPENAI_API_KEY to environment variables."
+        
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
         ]
@@ -50,6 +58,9 @@ def get_response_from_openai(user_query, open_ai_chat_history):
     
 def get_gemini_response(user_query, gemini_chat_history):
     try:
+        if not gemini_key:
+            return "Gemini API key is not configured. Please add GEMINI_API_KEY to environment variables."
+        
         model = genai.GenerativeModel(GEMINI_MODEL)
         # Build message history for Gemini
         chat_history = []
@@ -71,7 +82,8 @@ def get_gemini_response(user_query, gemini_chat_history):
         response = chat.send_message(full_msg)
         return response.text
     except Exception as e:
-        print(f"Error getting response from OpenAI: {e}")
+        print(f"Error getting response from Gemini: {e}")
+        return "Sorry, I'm having trouble processing your request right now."
         return "Sorry, I'm having trouble processing your request right now."
 
 
