@@ -4,6 +4,7 @@ Handles Firebase operations for user management and chat history
 """
 
 import os
+import json
 import uuid
 from datetime import datetime
 import firebase_admin
@@ -12,11 +13,57 @@ from firebase_admin import credentials, firestore, auth
 # Initialize Firebase (assumes credentials are already set up)
 SERVICE_ACCOUNT_KEY = "multi-llm-chat-487904-firebase-adminsdk-fbsvc-014c2efb00.json"
 
+def _ensure_firebase_credentials():
+    """Ensure Firebase credentials are available from file or environment variable"""
+    global SERVICE_ACCOUNT_KEY
+    
+    # Check if file exists locally
+    if os.path.exists(SERVICE_ACCOUNT_KEY):
+        print(f"✓ Firebase credentials file found: {SERVICE_ACCOUNT_KEY}")
+        return True
+    
+    # Try to create from environment variable
+    creds_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+    if creds_json:
+        try:
+            # Validate JSON format
+            json_data = json.loads(creds_json)
+            
+            # Create file
+            with open(SERVICE_ACCOUNT_KEY, 'w') as f:
+                json.dump(json_data, f)
+            
+            if os.path.exists(SERVICE_ACCOUNT_KEY):
+                print(f"✓ Firebase credentials file created: {SERVICE_ACCOUNT_KEY}")
+                return True
+            else:
+                print(f"✗ Failed to create Firebase credentials file")
+                return False
+                
+        except json.JSONDecodeError as e:
+            print(f"✗ Invalid JSON in FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+            return False
+        except Exception as e:
+            print(f"✗ Error creating Firebase credentials: {e}")
+            return False
+    else:
+        print(f"✗ Firebase credentials not found and FIREBASE_SERVICE_ACCOUNT_JSON not set")
+        return False
+
+
 def _get_firestore_client():
     """Get Firestore client, initializing Firebase if needed"""
     if not firebase_admin._apps:
+        # Ensure credentials exist
+        if not _ensure_firebase_credentials():
+            raise FileNotFoundError(
+                f"Firebase service account key not found: {SERVICE_ACCOUNT_KEY}\n"
+                f"Please set FIREBASE_SERVICE_ACCOUNT_JSON environment variable"
+            )
+        
         if not os.path.exists(SERVICE_ACCOUNT_KEY):
             raise FileNotFoundError(f"Service account key not found: {SERVICE_ACCOUNT_KEY}")
+        
         cred = credentials.Certificate(SERVICE_ACCOUNT_KEY)
         firebase_admin.initialize_app(cred)
     

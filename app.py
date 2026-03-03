@@ -143,11 +143,25 @@ def show_chat_page():
 
     # Register user in Firestore on first login
     if not st.session_state.user_id:
-        user_info = get_or_create_google_user(
-            email=st.session_state.user_email,
-            display_name=st.session_state.display_name or ''
-        )
-        st.session_state.user_id = st.session_state.user_email
+        try:
+            user_info = get_or_create_google_user(
+                email=st.session_state.user_email,
+                display_name=st.session_state.display_name or ''
+            )
+            st.session_state.user_id = st.session_state.user_email
+        except FileNotFoundError as e:
+            st.error(f"❌ **Firebase Configuration Missing**\n\n"
+                    f"Error: {str(e)}\n\n"
+                    f"**Fix this:**\n"
+                    f"1. Run: `python get_firebase_credentials.py`\n"
+                    f"2. Copy the JSON output\n"
+                    f"3. Go to Render Dashboard → Settings → Environment Variables\n"
+                    f"4. Add: `FIREBASE_SERVICE_ACCOUNT_JSON` = (paste the JSON)\n"
+                    f"5. Save and redeploy")
+            st.stop()
+        except Exception as e:
+            st.error(f"❌ **Firebase Error:** {str(e)}")
+            st.stop()
 
     # ---- Sidebar ----
     with st.sidebar:
