@@ -44,11 +44,28 @@ def ensure_credentials_file():
     creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
     if creds_json:
         try:
+            # Validate JSON format
+            json_data = json.loads(creds_json)
+            if not isinstance(json_data, dict) or 'web' not in json_data:
+                print("✗ Invalid credentials JSON: missing 'web' key")
+                return False
+            
+            # Create file
             os.makedirs(os.path.dirname(credentials_file), exist_ok=True)
             with open(credentials_file, 'w') as f:
                 f.write(creds_json)
-            print(f"✓ Credentials file created: {credentials_file}")
-            return os.path.exists(credentials_file)  # Verify it was created
+            
+            # Verify it was created
+            if os.path.exists(credentials_file):
+                print(f"✓ Credentials file created: {credentials_file}")
+                return True
+            else:
+                print(f"✗ Credentials file was not created")
+                return False
+                
+        except json.JSONDecodeError as e:
+            print(f"✗ Invalid JSON in GOOGLE_CLIENT_SECRET_JSON: {e}")
+            return False
         except Exception as e:
             print(f"✗ Error creating credentials file: {e}")
             print(f"  Attempted path: {credentials_file}")
@@ -88,7 +105,7 @@ for key, value in defaults.items():
 # ==================== Google Authentication ====================
 
 if not credentials_available:
-    st.error("❌ **Missing Google Credentials**\n\n" +
+    st.error("❌ **Missing or Invalid Google Credentials**\n\n" +
              "Please set the `GOOGLE_CLIENT_SECRET_JSON` environment variable on Render.\n\n" +
              "**How to fix:**\n" +
              "1. Get your Google Client Secret JSON content from your local file\n" +
@@ -96,9 +113,13 @@ if not credentials_available:
              "3. Scroll to **Environment Variables** section\n" +
              "4. Click **Add Environment Variable**\n" +
              "5. Key: `GOOGLE_CLIENT_SECRET_JSON`\n" +
-             "6. Value: Paste entire JSON content (including `{\"web\": {...}}`)\n" +
+             "6. Value: Paste entire JSON content exactly (including `{\"web\": {...}}`)\n" +
              "7. Click **Save Changes** → Render auto-redeploys\n\n" +
-             "⚠️ Make sure the JSON is valid and complete!")
+             "⚠️ **Important:**\n" +
+             "- The JSON must be valid and complete\n" +
+             "- It must contain a `web` key at the root level\n" +
+             "- No line breaks or formatting should be removed\n" +
+             "- Check the Logs (click Manage App) for validation errors")
     st.stop()
 
 try:
