@@ -28,15 +28,30 @@ load_dotenv()
 # ==================== Setup Google Credentials ====================
 # For production (Render), create credentials file from env variable
 credentials_file = 'client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json'
-if not os.path.exists(credentials_file):
-    # Try to create it from environment variable
-    creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
-    if creds_json:
-        try:
-            with open(credentials_file, 'w') as f:
-                f.write(creds_json)
-        except Exception as e:
-            print(f"Warning: Could not create credentials file from env: {e}")
+
+def ensure_credentials_file():
+    """Ensure credentials file exists, either locally or from environment."""
+    if not os.path.exists(credentials_file):
+        creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
+        if creds_json:
+            try:
+                with open(credentials_file, 'w') as f:
+                    f.write(creds_json)
+                print(f"✓ Credentials file created from environment variable")
+                return True
+            except Exception as e:
+                print(f"✗ Error creating credentials file from env: {e}")
+                return False
+        else:
+            print(f"✗ WARNING: Credentials file not found and GOOGLE_CLIENT_SECRET_JSON not set")
+            return False
+    else:
+        print(f"✓ Credentials file exists locally")
+        return True
+
+# Try to ensure credentials are available
+credentials_available = ensure_credentials_file()
+
 
 # ==================== Page Config ====================
 st.set_page_config(
@@ -62,6 +77,16 @@ for key, value in defaults.items():
 
 
 # ==================== Google Authentication ====================
+
+if not credentials_available:
+    st.error("❌ **Missing Google Credentials**\n\n" +
+             "Please set the `GOOGLE_CLIENT_SECRET_JSON` environment variable on Render.\n\n" +
+             "Steps:\n" +
+             "1. Copy your Google Client Secret JSON file content\n" +
+             "2. Go to Render Dashboard → Environment Variables\n" +
+             "3. Add: `GOOGLE_CLIENT_SECRET_JSON` = (paste entire JSON content)\n" +
+             "4. Redeploy")
+    st.stop()
 
 authenticator = Authenticate(
     secret_credentials_path=credentials_file,
