@@ -1,5 +1,4 @@
 from dotenv import load_dotenv
-from openai import OpenAI
 import os
 import google.generativeai as genai
 
@@ -20,19 +19,20 @@ if gemini_key:
     except Exception as e:
         print(f"Warning: Could not configure Gemini: {e}")
 
-# Initialize OpenAI client lazily (when needed)
-openai_client = None
+# Lazy loader for OpenAI client
+_openai_client = None
 
 def _get_openai_client():
-    """Lazily initialize OpenAI client"""
-    global openai_client
-    if openai_client is None and openai_key:
+    """Lazily initialize OpenAI client only when needed"""
+    global _openai_client
+    if _openai_client is None and openai_key:
         try:
-            openai_client = OpenAI(api_key=openai_key)
+            from openai import OpenAI
+            _openai_client = OpenAI(api_key=openai_key)
         except Exception as e:
             print(f"Error initializing OpenAI client: {e}")
             return None
-    return openai_client
+    return _openai_client
 
 SYSTEM_PROMPT = "You are a Sales Executive, who is supposed to sell AI course." \
     " You are very friendly and polite in your responses." \
