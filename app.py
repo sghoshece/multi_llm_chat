@@ -52,7 +52,7 @@ authenticator = Authenticate(
     secret_credentials_path='client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json',
     cookie_name='multi_llm_chat_auth',
     cookie_key='multi_llm_chat_secret_key',
-    redirect_uri='http://localhost:8501',
+    redirect_uri=os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8501"),
 )
 
 authenticator.check_authentification()
