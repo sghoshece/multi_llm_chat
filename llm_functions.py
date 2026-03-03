@@ -9,16 +9,30 @@ load_dotenv()
 OPEN_AI_MODEL = "gpt-4o-mini"
 GEMINI_MODEL = "gemini-3-flash-preview"
 
-# Initialize the Gemini client
-gemini_key = os.getenv("GEMINI_API_KEY")
-if gemini_key:
-    genai.configure(api_key=gemini_key)
-
-# Initialize the openai client
+# Store API keys
 openai_key = os.getenv("OPENAI_API_KEY")
+gemini_key = os.getenv("GEMINI_API_KEY")
+
+# Initialize Gemini only if key is available
+if gemini_key:
+    try:
+        genai.configure(api_key=gemini_key)
+    except Exception as e:
+        print(f"Warning: Could not configure Gemini: {e}")
+
+# Initialize OpenAI client lazily (when needed)
 openai_client = None
-if openai_key:
-    openai_client = OpenAI(api_key=openai_key)
+
+def _get_openai_client():
+    """Lazily initialize OpenAI client"""
+    global openai_client
+    if openai_client is None and openai_key:
+        try:
+            openai_client = OpenAI(api_key=openai_key)
+        except Exception as e:
+            print(f"Error initializing OpenAI client: {e}")
+            return None
+    return openai_client
 
 SYSTEM_PROMPT = "You are a Sales Executive, who is supposed to sell AI course." \
     " You are very friendly and polite in your responses." \
@@ -35,7 +49,8 @@ SYSTEM_PROMPT = "You are a Sales Executive, who is supposed to sell AI course." 
 
 def get_response_from_openai(user_query, open_ai_chat_history):
     try:
-        if not openai_client:
+        client = _get_openai_client()
+        if not client:
             return "OpenAI API key is not configured. Please add OPENAI_API_KEY to environment variables."
         
         messages = [
@@ -44,7 +59,7 @@ def get_response_from_openai(user_query, open_ai_chat_history):
         messages.extend(open_ai_chat_history)
         messages.append({"role": "user", "content": user_query})
 
-        completion = openai_client.chat.completions.create(
+        completion = client.chat.completions.create(
             model=OPEN_AI_MODEL,
             messages=messages,
             temperature=0.3,
