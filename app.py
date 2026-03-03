@@ -38,6 +38,10 @@ def ensure_credentials_file():
     # Check local file first
     if os.path.exists(credentials_file):
         print(f"✓ Credentials file exists: {credentials_file}")
+        # Update redirect_uris if on Render
+        render_url = os.getenv("RENDER_EXTERNAL_URL")
+        if render_url:
+            _update_redirect_uri_in_file(render_url)
         return True
     
     # Try to create from environment variable
@@ -50,10 +54,16 @@ def ensure_credentials_file():
                 print("✗ Invalid credentials JSON: missing 'web' key")
                 return False
             
+            # Update redirect_uris to include Render URL
+            render_url = os.getenv("RENDER_EXTERNAL_URL")
+            if render_url:
+                json_data['web']['redirect_uris'] = ['http://localhost:8501', render_url]
+                print(f"✓ Updated redirect_uris for Render: {json_data['web']['redirect_uris']}")
+            
             # Create file
             os.makedirs(os.path.dirname(credentials_file), exist_ok=True)
             with open(credentials_file, 'w') as f:
-                f.write(creds_json)
+                json.dump(json_data, f)
             
             # Verify it was created
             if os.path.exists(credentials_file):
@@ -74,6 +84,27 @@ def ensure_credentials_file():
         print(f"✗ Credentials file not found: {credentials_file}")
         print(f"✗ GOOGLE_CLIENT_SECRET_JSON environment variable not set")
         return False
+
+
+def _update_redirect_uri_in_file(render_url):
+    """Update redirect_uris in the credentials file to include Render URL"""
+    try:
+        if not os.path.exists(credentials_file):
+            return
+        
+        with open(credentials_file, 'r') as f:
+            creds = json.load(f)
+        
+        # Update with both localhost and Render URL
+        new_uris = ['http://localhost:8501', render_url]
+        creds['web']['redirect_uris'] = new_uris
+        
+        with open(credentials_file, 'w') as f:
+            json.dump(creds, f)
+        
+        print(f"✓ Updated redirect_uris in credentials file: {new_uris}")
+    except Exception as e:
+        print(f"Warning: Could not update redirect_uris: {e}")
 
 # Ensure credentials are available before creating authenticator
 credentials_available = ensure_credentials_file()
@@ -105,6 +136,7 @@ for key, value in defaults.items():
 # ==================== Google Authentication ====================
 
 if not credentials_available:
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "[Render will set this]")
     st.error("❌ **Missing or Invalid Google Credentials**\n\n" +
              "Please set the `GOOGLE_CLIENT_SECRET_JSON` environment variable on Render.\n\n" +
              "**How to fix:**\n" +
@@ -115,10 +147,17 @@ if not credentials_available:
              "5. Key: `GOOGLE_CLIENT_SECRET_JSON`\n" +
              "6. Value: Paste entire JSON content exactly (including `{\"web\": {...}}`)\n" +
              "7. Click **Save Changes** → Render auto-redeploys\n\n" +
+             f"8. **ALSO update Google Cloud Console:**\n" +
+             f"   - Go to Google Cloud Console → APIs & Services → Credentials\n" +
+             f"   - Edit your OAuth 2.0 Client ID\n" +
+             f"   - Add to Authorized redirect URIs:\n" +
+             f"     • http://localhost:8501\n" +
+             f"     • {render_url}\n" +
+             f"   - Save changes\n\n" +
              "⚠️ **Important:**\n" +
              "- The JSON must be valid and complete\n" +
              "- It must contain a `web` key at the root level\n" +
-             "- No line breaks or formatting should be removed\n" +
+             "- Update Google Cloud Console with the redirect URIs\n" +
              "- Check the Logs (click Manage App) for validation errors")
     st.stop()
 
@@ -137,7 +176,23 @@ except FileNotFoundError as e:
              "Please ensure GOOGLE_CLIENT_SECRET_JSON is set correctly.")
     st.stop()
 except Exception as e:
-    st.error(f"❌ **Authentication Error:** {str(e)}")
+    error_msg = str(e)
+    
+    if "invalid_grant" in error_msg or "code_verifier" in error_msg:
+        st.error(f"❌ **OAuth Error: {error_msg}**\n\n"
+                 "This usually means the redirect URI doesn't match Google Cloud settings.\n\n"
+                 "**Fix this:**\n"
+                 "1. Get your Render URL from the dashboard: https://dashboard.render.com\n"
+                 "2. Go to Google Cloud Console → APIs & Services → Credentials\n"
+                 "3. Edit your OAuth 2.0 Client ID\n"
+                 "4. Add these to Authorized redirect URIs:\n"
+                 "   • http://localhost:8501\n"
+                 "   • https://your-render-app.onrender.com\n"
+                 "5. Save and wait ~1 minute for changes to propagate\n"
+                 "6. Try logging in again")
+    else:
+        st.error(f"❌ **Authentication Error:** {error_msg}\n\n"
+                 "Check the Logs (Manage App) for more details.")
     st.stop()
 
 
