@@ -20,8 +20,23 @@ import os
 from dotenv import load_dotenv
 import threading
 from queue import Queue
+import json
+import tempfile
 
 load_dotenv()
+
+# ==================== Setup Google Credentials ====================
+# For production (Render), create credentials file from env variable
+credentials_file = 'client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json'
+if not os.path.exists(credentials_file):
+    # Try to create it from environment variable
+    creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
+    if creds_json:
+        try:
+            with open(credentials_file, 'w') as f:
+                f.write(creds_json)
+        except Exception as e:
+            print(f"Warning: Could not create credentials file from env: {e}")
 
 # ==================== Page Config ====================
 st.set_page_config(
@@ -49,7 +64,7 @@ for key, value in defaults.items():
 # ==================== Google Authentication ====================
 
 authenticator = Authenticate(
-    secret_credentials_path='client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json',
+    secret_credentials_path=credentials_file,
     cookie_name='multi_llm_chat_auth',
     cookie_key='multi_llm_chat_secret_key',
     redirect_uri=os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8501"),
