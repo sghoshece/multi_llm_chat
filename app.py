@@ -151,16 +151,21 @@ def show_chat_page():
             st.session_state.user_id = st.session_state.user_email
         except FileNotFoundError as e:
             st.error(f"❌ **Firebase Configuration Missing**\n\n"
-                    f"Error: {str(e)}\n\n"
-                    f"**Fix this:**\n"
-                    f"1. Run: `python get_firebase_credentials.py`\n"
-                    f"2. Copy the JSON output\n"
-                    f"3. Go to Render Dashboard → Settings → Environment Variables\n"
-                    f"4. Add: `FIREBASE_SERVICE_ACCOUNT_JSON` = (paste the JSON)\n"
-                    f"5. Save and redeploy")
+                    f"{str(e)}\n\n"
+                    f"**How to fix:**\n"
+                    f"1. Run locally: `python get_firebase_credentials.py`\n"
+                    f"2. Copy the entire JSON output (including `{{` and `}}`)\n"
+                    f"3. Go to Render Dashboard → **multi-llm-chat** → **Settings**\n"
+                    f"4. Click **Environment Variables** → **Add Environment Variable**\n"
+                    f"5. Key: `FIREBASE_SERVICE_ACCOUNT_JSON`\n"
+                    f"6. Value: Paste the entire JSON (no extra spaces)\n"
+                    f"7. Click **Save Changes**\n"
+                    f"8. Wait for Render to redeploy (1-2 minutes)\n"
+                    f"9. Refresh this page")
             st.stop()
         except Exception as e:
-            st.error(f"❌ **Firebase Error:** {str(e)}")
+            st.error(f"❌ **Firebase Error:** {str(e)}\n\n"
+                    f"Check the Render logs for more details.")
             st.stop()
 
     # ---- Sidebar ----

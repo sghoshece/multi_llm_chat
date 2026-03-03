@@ -19,35 +19,57 @@ def _ensure_firebase_credentials():
     
     # Check if file exists locally
     if os.path.exists(SERVICE_ACCOUNT_KEY):
-        print(f"✓ Firebase credentials file found: {SERVICE_ACCOUNT_KEY}")
-        return True
+        try:
+            with open(SERVICE_ACCOUNT_KEY, 'r') as f:
+                test_parse = json.load(f)
+            print(f"✓ Firebase credentials file found and valid: {SERVICE_ACCOUNT_KEY}")
+            return True
+        except Exception as e:
+            print(f"⚠️  Firebase file exists but is invalid: {e}")
     
     # Try to create from environment variable
     creds_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
-    if creds_json:
-        try:
-            # Validate JSON format
-            json_data = json.loads(creds_json)
-            
-            # Create file
-            with open(SERVICE_ACCOUNT_KEY, 'w') as f:
-                json.dump(json_data, f)
-            
-            if os.path.exists(SERVICE_ACCOUNT_KEY):
-                print(f"✓ Firebase credentials file created: {SERVICE_ACCOUNT_KEY}")
-                return True
-            else:
-                print(f"✗ Failed to create Firebase credentials file")
-                return False
-                
-        except json.JSONDecodeError as e:
-            print(f"✗ Invalid JSON in FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+    if not creds_json:
+        print(f"✗ FIREBASE_SERVICE_ACCOUNT_JSON environment variable not set")
+        return False
+    
+    try:
+        print(f"Attempting to parse FIREBASE_SERVICE_ACCOUNT_JSON...")
+        
+        # Try to parse the JSON
+        json_data = json.loads(creds_json)
+        print(f"✓ JSON parsed successfully")
+        
+        # Validate it has required fields
+        required_fields = ['type', 'project_id', 'private_key', 'client_email']
+        missing = [f for f in required_fields if f not in json_data]
+        if missing:
+            print(f"⚠️  Missing required fields in JSON: {missing}")
+            # Don't fail yet - might still work
+        
+        # Create file
+        print(f"Creating credentials file at {SERVICE_ACCOUNT_KEY}...")
+        with open(SERVICE_ACCOUNT_KEY, 'w') as f:
+            json.dump(json_data, f, indent=2)
+        
+        # Verify it was created and is readable
+        if os.path.exists(SERVICE_ACCOUNT_KEY):
+            with open(SERVICE_ACCOUNT_KEY, 'r') as f:
+                verify = json.load(f)
+            print(f"✓ Firebase credentials file created and verified: {SERVICE_ACCOUNT_KEY}")
+            return True
+        else:
+            print(f"✗ File was created but not found when verified")
             return False
-        except Exception as e:
-            print(f"✗ Error creating Firebase credentials: {e}")
-            return False
-    else:
-        print(f"✗ Firebase credentials not found and FIREBASE_SERVICE_ACCOUNT_JSON not set")
+            
+    except json.JSONDecodeError as e:
+        print(f"✗ Invalid JSON in FIREBASE_SERVICE_ACCOUNT_JSON: {e}")
+        print(f"   First 100 chars: {creds_json[:100]}")
+        return False
+    except Exception as e:
+        print(f"✗ Error processing Firebase credentials: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -55,17 +77,24 @@ def _get_firestore_client():
     """Get Firestore client, initializing Firebase if needed"""
     if not firebase_admin._apps:
         # Ensure credentials exist
-        if not _ensure_firebase_credentials():
-            raise FileNotFoundError(
+        credentials_ok = _ensure_firebase_credentials()
+        
+        if not credentials_ok or not os.path.exists(SERVICE_ACCOUNT_KEY):
+            error_msg = (
                 f"Firebase service account key not found: {SERVICE_ACCOUNT_KEY}\n"
-                f"Please set FIREBASE_SERVICE_ACCOUNT_JSON environment variable"
+                f"Environment variable FIREBASE_SERVICE_ACCOUNT_JSON may not be set correctly.\n"
+                f"The variable should contain the entire JSON from your Firebase service account."
             )
+            print(f"✗ {error_msg}")
+            raise FileNotFoundError(error_msg)
         
-        if not os.path.exists(SERVICE_ACCOUNT_KEY):
-            raise FileNotFoundError(f"Service account key not found: {SERVICE_ACCOUNT_KEY}")
-        
-        cred = credentials.Certificate(SERVICE_ACCOUNT_KEY)
-        firebase_admin.initialize_app(cred)
+        try:
+            cred = credentials.Certificate(SERVICE_ACCOUNT_KEY)
+            firebase_admin.initialize_app(cred)
+            print(f"✓ Firebase initialized successfully")
+        except Exception as e:
+            print(f"✗ Error initializing Firebase: {e}")
+            raise
     
     return firestore.client()
 
