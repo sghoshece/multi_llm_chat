@@ -26,30 +26,39 @@ import tempfile
 load_dotenv()
 
 # ==================== Setup Google Credentials ====================
-# For production (Render), create credentials file from env variable
-credentials_file = 'client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json'
+# Use absolute path for credentials file
+script_dir = os.path.dirname(os.path.abspath(__file__))
+credentials_filename = 'client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json'
+credentials_file = os.path.join(script_dir, credentials_filename)
 
 def ensure_credentials_file():
     """Ensure credentials file exists, either locally or from environment."""
-    if not os.path.exists(credentials_file):
-        creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
-        if creds_json:
-            try:
-                with open(credentials_file, 'w') as f:
-                    f.write(creds_json)
-                print(f"✓ Credentials file created from environment variable")
-                return True
-            except Exception as e:
-                print(f"✗ Error creating credentials file from env: {e}")
-                return False
-        else:
-            print(f"✗ WARNING: Credentials file not found and GOOGLE_CLIENT_SECRET_JSON not set")
+    global credentials_file
+    
+    # Check local file first
+    if os.path.exists(credentials_file):
+        print(f"✓ Credentials file exists: {credentials_file}")
+        return True
+    
+    # Try to create from environment variable
+    creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
+    if creds_json:
+        try:
+            os.makedirs(os.path.dirname(credentials_file), exist_ok=True)
+            with open(credentials_file, 'w') as f:
+                f.write(creds_json)
+            print(f"✓ Credentials file created: {credentials_file}")
+            return os.path.exists(credentials_file)  # Verify it was created
+        except Exception as e:
+            print(f"✗ Error creating credentials file: {e}")
+            print(f"  Attempted path: {credentials_file}")
             return False
     else:
-        print(f"✓ Credentials file exists locally")
-        return True
+        print(f"✗ Credentials file not found: {credentials_file}")
+        print(f"✗ GOOGLE_CLIENT_SECRET_JSON environment variable not set")
+        return False
 
-# Try to ensure credentials are available
+# Ensure credentials are available before creating authenticator
 credentials_available = ensure_credentials_file()
 
 
@@ -81,21 +90,34 @@ for key, value in defaults.items():
 if not credentials_available:
     st.error("❌ **Missing Google Credentials**\n\n" +
              "Please set the `GOOGLE_CLIENT_SECRET_JSON` environment variable on Render.\n\n" +
-             "Steps:\n" +
-             "1. Copy your Google Client Secret JSON file content\n" +
-             "2. Go to Render Dashboard → Environment Variables\n" +
-             "3. Add: `GOOGLE_CLIENT_SECRET_JSON` = (paste entire JSON content)\n" +
-             "4. Redeploy")
+             "**How to fix:**\n" +
+             "1. Get your Google Client Secret JSON content from your local file\n" +
+             "2. Go to Render Dashboard → **multi-llm-chat** → **Settings**\n" +
+             "3. Scroll to **Environment Variables** section\n" +
+             "4. Click **Add Environment Variable**\n" +
+             "5. Key: `GOOGLE_CLIENT_SECRET_JSON`\n" +
+             "6. Value: Paste entire JSON content (including `{\"web\": {...}}`)\n" +
+             "7. Click **Save Changes** → Render auto-redeploys\n\n" +
+             "⚠️ Make sure the JSON is valid and complete!")
     st.stop()
 
-authenticator = Authenticate(
-    secret_credentials_path=credentials_file,
-    cookie_name='multi_llm_chat_auth',
-    cookie_key='multi_llm_chat_secret_key',
-    redirect_uri=os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8501"),
-)
-
-authenticator.check_authentification()
+try:
+    authenticator = Authenticate(
+        secret_credentials_path=credentials_file,
+        cookie_name='multi_llm_chat_auth',
+        cookie_key='multi_llm_chat_secret_key',
+        redirect_uri=os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8501"),
+    )
+    
+    authenticator.check_authentification()
+except FileNotFoundError as e:
+    st.error(f"❌ **Credential File Error:** {credentials_file} not found\n\n"
+             f"Details: {str(e)}\n\n"
+             "Please ensure GOOGLE_CLIENT_SECRET_JSON is set correctly.")
+    st.stop()
+except Exception as e:
+    st.error(f"❌ **Authentication Error:** {str(e)}")
+    st.stop()
 
 
 # ==================== Chat Interface ====================
@@ -157,7 +179,13 @@ def show_login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("---")
-        authenticator.login()
+        try:
+            authenticator.login()
+        except FileNotFoundError:
+            st.error(f"❌ **Credential file not found:** {credentials_file}\n\n"
+                     "Please set GOOGLE_CLIENT_SECRET_JSON environment variable on Render.")
+        except Exception as e:
+            st.error(f"❌ **Login Error:** {str(e)}")
         st.markdown("---")
         st.caption("Sign in with your Google account to access the Multi-LLM Chat application.")
 
