@@ -4,12 +4,12 @@ Streamlit app with Google Sign-In (Firebase) and Firestore chat history.
 
 Setup:
   1. Go to Google Cloud Console > APIs & Credentials > Create OAuth 2.0 Client ID
-  2. Set Authorized redirect URIs to: http://localhost:8501
-  3. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your .env file
+  2. Set Authorized redirect URIs to: http://localhost:8501 and https://your-app.onrender.com
+  3. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET to env variables
   4. Run with: streamlit run app.py
 """
 import streamlit as st
-from streamlit_google_auth import Authenticate
+from google_auth import GoogleAuthenticator
 from firebase_service import (
     get_or_create_google_user,
     save_chat_message,
@@ -21,94 +21,31 @@ from dotenv import load_dotenv
 import threading
 from queue import Queue
 import json
-import tempfile
 
 load_dotenv()
 
-# ==================== Setup Google Credentials ====================
-# Use absolute path for credentials file
-script_dir = os.path.dirname(os.path.abspath(__file__))
-credentials_filename = 'client_secret_322929524449-ok5mli1n1o8q049nqm6j7smfklq11g09.apps.googleusercontent.com.json'
-credentials_file = os.path.join(script_dir, credentials_filename)
+# ==================== Setup Google OAuth ====================
+# Get OAuth credentials from environment variables
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8501")
 
-def ensure_credentials_file():
-    """Ensure credentials file exists, either locally or from environment."""
-    global credentials_file
-    
-    # Check local file first
-    if os.path.exists(credentials_file):
-        print(f"✓ Credentials file exists: {credentials_file}")
-        # Update redirect_uris if on Render
-        render_url = os.getenv("RENDER_EXTERNAL_URL")
-        if render_url:
-            _update_redirect_uri_in_file(render_url)
-        return True
-    
-    # Try to create from environment variable
-    creds_json = os.getenv('GOOGLE_CLIENT_SECRET_JSON')
-    if creds_json:
-        try:
-            # Validate JSON format
-            json_data = json.loads(creds_json)
-            if not isinstance(json_data, dict) or 'web' not in json_data:
-                print("✗ Invalid credentials JSON: missing 'web' key")
-                return False
-            
-            # Update redirect_uris to include Render URL
-            render_url = os.getenv("RENDER_EXTERNAL_URL")
-            if render_url:
-                json_data['web']['redirect_uris'] = ['http://localhost:8501', render_url]
-                print(f"✓ Updated redirect_uris for Render: {json_data['web']['redirect_uris']}")
-            
-            # Create file
-            os.makedirs(os.path.dirname(credentials_file), exist_ok=True)
-            with open(credentials_file, 'w') as f:
-                json.dump(json_data, f)
-            
-            # Verify it was created
-            if os.path.exists(credentials_file):
-                print(f"✓ Credentials file created: {credentials_file}")
-                return True
-            else:
-                print(f"✗ Credentials file was not created")
-                return False
-                
-        except json.JSONDecodeError as e:
-            print(f"✗ Invalid JSON in GOOGLE_CLIENT_SECRET_JSON: {e}")
-            return False
-        except Exception as e:
-            print(f"✗ Error creating credentials file: {e}")
-            print(f"  Attempted path: {credentials_file}")
-            return False
-    else:
-        print(f"✗ Credentials file not found: {credentials_file}")
-        print(f"✗ GOOGLE_CLIENT_SECRET_JSON environment variable not set")
-        return False
+# Initialize authenticator
+if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    st.error("❌ **Missing Google OAuth Configuration**\n\n"
+             "Please set these environment variables:\n"
+             "- `GOOGLE_CLIENT_ID`\n"
+             "- `GOOGLE_CLIENT_SECRET`\n\n"
+             "Get these from Google Cloud Console → OAuth 2.0 Client IDs")
+    st.stop()
 
+authenticator = GoogleAuthenticator(
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI
+)
 
-def _update_redirect_uri_in_file(render_url):
-    """Update redirect_uris in the credentials file to include Render URL"""
-    try:
-        if not os.path.exists(credentials_file):
-            return
-        
-        with open(credentials_file, 'r') as f:
-            creds = json.load(f)
-        
-        # Update with both localhost and Render URL
-        new_uris = ['http://localhost:8501', render_url]
-        creds['web']['redirect_uris'] = new_uris
-        
-        with open(credentials_file, 'w') as f:
-            json.dump(creds, f)
-        
-        print(f"✓ Updated redirect_uris in credentials file: {new_uris}")
-    except Exception as e:
-        print(f"Warning: Could not update redirect_uris: {e}")
-
-# Ensure credentials are available before creating authenticator
-credentials_available = ensure_credentials_file()
-
+print(f"✓ OAuth configured with redirect_uri: {REDIRECT_URI}")
 
 # ==================== Page Config ====================
 st.set_page_config(
@@ -119,7 +56,7 @@ st.set_page_config(
 
 # ==================== Session State Initialization ====================
 defaults = {
-    'connected': False,
+    'authenticated': False,
     'user_id': None,
     'user_email': None,
     'display_name': None,
@@ -132,68 +69,9 @@ for key, value in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
-
-# ==================== Google Authentication ====================
-
-if not credentials_available:
-    render_url = os.getenv("RENDER_EXTERNAL_URL", "[Render will set this]")
-    st.error("❌ **Missing or Invalid Google Credentials**\n\n" +
-             "Please set the `GOOGLE_CLIENT_SECRET_JSON` environment variable on Render.\n\n" +
-             "**How to fix:**\n" +
-             "1. Get your Google Client Secret JSON content from your local file\n" +
-             "2. Go to Render Dashboard → **multi-llm-chat** → **Settings**\n" +
-             "3. Scroll to **Environment Variables** section\n" +
-             "4. Click **Add Environment Variable**\n" +
-             "5. Key: `GOOGLE_CLIENT_SECRET_JSON`\n" +
-             "6. Value: Paste entire JSON content exactly (including `{\"web\": {...}}`)\n" +
-             "7. Click **Save Changes** → Render auto-redeploys\n\n" +
-             f"8. **ALSO update Google Cloud Console:**\n" +
-             f"   - Go to Google Cloud Console → APIs & Services → Credentials\n" +
-             f"   - Edit your OAuth 2.0 Client ID\n" +
-             f"   - Add to Authorized redirect URIs:\n" +
-             f"     • http://localhost:8501\n" +
-             f"     • {render_url}\n" +
-             f"   - Save changes\n\n" +
-             "⚠️ **Important:**\n" +
-             "- The JSON must be valid and complete\n" +
-             "- It must contain a `web` key at the root level\n" +
-             "- Update Google Cloud Console with the redirect URIs\n" +
-             "- Check the Logs (click Manage App) for validation errors")
-    st.stop()
-
-try:
-    authenticator = Authenticate(
-        secret_credentials_path=credentials_file,
-        cookie_name='multi_llm_chat_auth',
-        cookie_key='multi_llm_chat_secret_key',
-        redirect_uri=os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8501"),
-    )
-    
-    authenticator.check_authentification()
-except FileNotFoundError as e:
-    st.error(f"❌ **Credential File Error:** {credentials_file} not found\n\n"
-             f"Details: {str(e)}\n\n"
-             "Please ensure GOOGLE_CLIENT_SECRET_JSON is set correctly.")
-    st.stop()
-except Exception as e:
-    error_msg = str(e)
-    
-    if "invalid_grant" in error_msg or "code_verifier" in error_msg:
-        st.error(f"❌ **OAuth Error: {error_msg}**\n\n"
-                 "This usually means the redirect URI doesn't match Google Cloud settings.\n\n"
-                 "**Fix this:**\n"
-                 "1. Get your Render URL from the dashboard: https://dashboard.render.com\n"
-                 "2. Go to Google Cloud Console → APIs & Services → Credentials\n"
-                 "3. Edit your OAuth 2.0 Client ID\n"
-                 "4. Add these to Authorized redirect URIs:\n"
-                 "   • http://localhost:8501\n"
-                 "   • https://your-render-app.onrender.com\n"
-                 "5. Save and wait ~1 minute for changes to propagate\n"
-                 "6. Try logging in again")
-    else:
-        st.error(f"❌ **Authentication Error:** {error_msg}\n\n"
-                 "Check the Logs (Manage App) for more details.")
-    st.stop()
+# ==================== Authentication Check ====================
+# Try to authenticate using the OAuth flow
+authenticator.authenticate()
 
 
 # ==================== Chat Interface ====================
@@ -255,13 +133,7 @@ def show_login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("---")
-        try:
-            authenticator.login()
-        except FileNotFoundError:
-            st.error(f"❌ **Credential file not found:** {credentials_file}\n\n"
-                     "Please set GOOGLE_CLIENT_SECRET_JSON environment variable on Render.")
-        except Exception as e:
-            st.error(f"❌ **Login Error:** {str(e)}")
+        authenticator.show_login_button()
         st.markdown("---")
         st.caption("Sign in with your Google account to access the Multi-LLM Chat application.")
 
@@ -279,8 +151,8 @@ def show_chat_page():
 
     # ---- Sidebar ----
     with st.sidebar:
-        if st.session_state.get('user_info', {}).get('picture'):
-            st.image(st.session_state['user_info']['picture'], width=80)
+        if st.session_state.get('user_picture'):
+            st.image(st.session_state['user_picture'], width=80)
         st.markdown(f"### 👤 {st.session_state.display_name or st.session_state.user_email}")
         st.caption(st.session_state.user_email)
         st.markdown("---")
@@ -448,10 +320,8 @@ def show_chat_page():
 
 # ==================== Main App Router ====================
 
-if st.session_state.get('connected'):
+if st.session_state.get('authenticated') and st.session_state.user_email:
     # User is authenticated via Google
-    st.session_state.user_email = st.session_state.get('user_info', {}).get('email', '')
-    st.session_state.display_name = st.session_state.get('user_info', {}).get('name', '')
     show_chat_page()
 else:
     show_login_page()
