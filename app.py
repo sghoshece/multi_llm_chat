@@ -35,6 +35,12 @@ st.set_page_config(
 # Get API key from environment (loaded from .env locally, from Render dashboard on production)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Debug logging
+print(f"Debug: OPENAI_API_KEY exists: {bool(OPENAI_API_KEY)}")
+print(f"Debug: OPENAI_API_KEY length: {len(OPENAI_API_KEY) if OPENAI_API_KEY else 0}")
+if OPENAI_API_KEY:
+    print(f"Debug: OPENAI_API_KEY starts with: {OPENAI_API_KEY[:20]}...")
+
 if not OPENAI_API_KEY:
     st.error("❌ **Missing OpenAI API Key**\n\nPlease set the environment variable:\n- `OPENAI_API_KEY`\n\nYou can add it to your system environment variables or a .env file in your project root.")
     st.stop()
