@@ -8,21 +8,36 @@ Setup:
   3. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET to env variables
   4. Run with: streamlit run app.py
 """
+print("1. Starting app.py...")
+
+# MUST load environment variables FIRST before any other imports
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+print("2. Environment variables loaded")
+
 import streamlit as st
+print("3. Streamlit imported")
+
 from google_auth import GoogleAuthenticator
+print("4. GoogleAuthenticator imported")
+
 from firebase_service import (
     get_or_create_google_user,
     save_chat_message,
     get_chat_history, clear_chat_history
 )
+print("5. Firebase service imported")
+
 from llm_functions import get_gemini_response, get_response_from_openai
-import os
-from dotenv import load_dotenv
+print("6. LLM functions imported")
+
 import threading
 from queue import Queue
 import json
 
-load_dotenv()
+print("7. All imports complete")
 
 # ==================== Page Config (MUST BE FIRST STREAMLIT COMMAND) ====================
 st.set_page_config(
