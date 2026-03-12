@@ -14,7 +14,8 @@ def _get_api_keys():
         import streamlit as st
         openai_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         gemini_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
-    except (ImportError, AttributeError):
+    except (ImportError, AttributeError, FileNotFoundError, KeyError):
+        # Fallback to environment variables if Streamlit secrets not available
         openai_key = os.getenv("OPENAI_API_KEY")
         gemini_key = os.getenv("GEMINI_API_KEY")
     return openai_key, gemini_key

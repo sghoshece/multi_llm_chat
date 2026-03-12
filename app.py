@@ -28,7 +28,7 @@ load_dotenv()
 # Try st.secrets first (Streamlit), then fall back to environment variables
 try:
     OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-except (KeyError, FileNotFoundError):
+except (KeyError, FileNotFoundError, AttributeError):
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not OPENAI_API_KEY:
