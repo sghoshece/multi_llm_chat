@@ -9,15 +9,9 @@ OPEN_AI_MODEL = "gpt-4o-mini"
 GEMINI_MODEL = "gemini-3-flash-preview"
 
 def _get_api_keys():
-    """Get API keys from environment variables or Streamlit secrets"""
-    try:
-        import streamlit as st
-        openai_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-        gemini_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
-    except (ImportError, AttributeError, FileNotFoundError, KeyError, Exception):
-        # Fallback to environment variables if Streamlit secrets not available
-        openai_key = os.getenv("OPENAI_API_KEY")
-        gemini_key = os.getenv("GEMINI_API_KEY")
+    """Get API keys from environment variables"""
+    openai_key = os.getenv("OPENAI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
     return openai_key, gemini_key
 
 # Initialize Gemini only on first use (lazy loading)
