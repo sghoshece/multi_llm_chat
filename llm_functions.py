@@ -8,9 +8,19 @@ load_dotenv()
 OPEN_AI_MODEL = "gpt-4o-mini"
 GEMINI_MODEL = "gemini-3-flash-preview"
 
-# Store API keys
-openai_key = os.getenv("OPENAI_API_KEY")
-gemini_key = os.getenv("GEMINI_API_KEY")
+def _get_api_keys():
+    """Get API keys from environment variables or Streamlit secrets"""
+    try:
+        import streamlit as st
+        openai_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+        gemini_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+    except (ImportError, AttributeError):
+        openai_key = os.getenv("OPENAI_API_KEY")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+    return openai_key, gemini_key
+
+# Get API keys
+openai_key, gemini_key = _get_api_keys()
 
 # Initialize Gemini only if key is available
 if gemini_key:
@@ -25,13 +35,16 @@ _openai_client = None
 def _get_openai_client():
     """Lazily initialize OpenAI client only when needed"""
     global _openai_client
-    if _openai_client is None and openai_key:
-        try:
-            from openai import OpenAI
-            _openai_client = OpenAI(api_key=openai_key)
-        except Exception as e:
-            print(f"Error initializing OpenAI client: {e}")
-            return None
+    if _openai_client is None:
+        # Refresh API keys in case they've been set since module import
+        current_openai_key, _ = _get_api_keys()
+        if current_openai_key:
+            try:
+                from openai import OpenAI
+                _openai_client = OpenAI(api_key=current_openai_key)
+            except Exception as e:
+                print(f"Error initializing OpenAI client: {e}")
+                return None
     return _openai_client
 
 SYSTEM_PROMPT = "You are a Sales Executive, who is supposed to sell AI course." \

@@ -25,7 +25,12 @@ import json
 load_dotenv()
 
 # ==================== OpenAI API Key Check ====================
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Try st.secrets first (Streamlit), then fall back to environment variables
+try:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+except (KeyError, FileNotFoundError):
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 if not OPENAI_API_KEY:
     st.error("❌ **Missing OpenAI API Key**\n\nPlease set the environment variable:\n- `OPENAI_API_KEY`\n\nYou can add it to your system environment variables or a .env file in your project root.")
     st.stop()
