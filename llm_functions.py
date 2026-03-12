@@ -42,6 +42,18 @@ def _get_openai_client():
             try:
                 from openai import OpenAI
                 _openai_client = OpenAI(api_key=current_openai_key)
+            except TypeError as e:
+                # Handle httpx version incompatibility (proxies parameter removed in httpx>=0.28)
+                if "proxies" in str(e):
+                    import httpx
+                    from openai import OpenAI
+                    _openai_client = OpenAI(
+                        api_key=current_openai_key,
+                        http_client=httpx.Client()
+                    )
+                else:
+                    print(f"Error initializing OpenAI client: {e}")
+                    return None
             except Exception as e:
                 print(f"Error initializing OpenAI client: {e}")
                 return None
