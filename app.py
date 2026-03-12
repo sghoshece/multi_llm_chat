@@ -24,6 +24,13 @@ import json
 
 load_dotenv()
 
+# ==================== Page Config (MUST BE FIRST STREAMLIT COMMAND) ====================
+st.set_page_config(
+    page_title="Multi-LLM Chat",
+    page_icon="🤖",
+    layout="wide"
+)
+
 # ==================== OpenAI API Key Check ====================
 # Try st.secrets first (Streamlit), then fall back to environment variables
 try:
@@ -57,13 +64,6 @@ authenticator = GoogleAuthenticator(
 )
 
 print(f"✓ OAuth configured with redirect_uri: {REDIRECT_URI}")
-
-# ==================== Page Config ====================
-st.set_page_config(
-    page_title="Multi-LLM Chat",
-    page_icon="🤖",
-    layout="wide"
-)
 
 # ==================== Session State Initialization ====================
 defaults = {

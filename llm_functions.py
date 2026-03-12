@@ -14,21 +14,26 @@ def _get_api_keys():
         import streamlit as st
         openai_key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
         gemini_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
-    except (ImportError, AttributeError, FileNotFoundError, KeyError):
+    except (ImportError, AttributeError, FileNotFoundError, KeyError, Exception):
         # Fallback to environment variables if Streamlit secrets not available
         openai_key = os.getenv("OPENAI_API_KEY")
         gemini_key = os.getenv("GEMINI_API_KEY")
     return openai_key, gemini_key
 
-# Get API keys
-openai_key, gemini_key = _get_api_keys()
+# Initialize Gemini only on first use (lazy loading)
+_gemini_initialized = False
 
-# Initialize Gemini only if key is available
-if gemini_key:
-    try:
-        genai.configure(api_key=gemini_key)
-    except Exception as e:
-        print(f"Warning: Could not configure Gemini: {e}")
+def _initialize_gemini():
+    """Lazily initialize Gemini when first needed"""
+    global _gemini_initialized
+    if not _gemini_initialized:
+        _, gemini_key = _get_api_keys()
+        if gemini_key:
+            try:
+                genai.configure(api_key=gemini_key)
+                _gemini_initialized = True
+            except Exception as e:
+                print(f"Warning: Could not configure Gemini: {e}")
 
 # Lazy loader for OpenAI client
 _openai_client = None
@@ -87,6 +92,10 @@ def get_response_from_openai(user_query, open_ai_chat_history):
     
 def get_gemini_response(user_query, gemini_chat_history):
     try:
+        # Initialize Gemini on first use
+        _initialize_gemini()
+        
+        _, gemini_key = _get_api_keys()
         if not gemini_key:
             return "Gemini API key is not configured. Please add GEMINI_API_KEY to environment variables."
         
@@ -112,7 +121,6 @@ def get_gemini_response(user_query, gemini_chat_history):
         return response.text
     except Exception as e:
         print(f"Error getting response from Gemini: {e}")
-        return "Sorry, I'm having trouble processing your request right now."
         return "Sorry, I'm having trouble processing your request right now."
 
 
