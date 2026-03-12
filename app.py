@@ -24,6 +24,12 @@ import json
 
 load_dotenv()
 
+# ==================== OpenAI API Key Check ====================
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    st.error("❌ **Missing OpenAI API Key**\n\nPlease set the environment variable:\n- `OPENAI_API_KEY`\n\nYou can add it to your system environment variables or a .env file in your project root.")
+    st.stop()
+
 # ==================== Setup Google OAuth ====================
 # Get OAuth credentials from environment variables
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")

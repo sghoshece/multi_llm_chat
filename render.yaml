@@ -14,3 +14,11 @@ services:
         value: "true"
       - key: STREAMLIT_LOGGER_LEVEL
         value: "info"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
